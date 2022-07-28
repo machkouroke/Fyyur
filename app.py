@@ -8,6 +8,7 @@ import babel
 from flask import Flask, render_template, request, Response, flash, redirect, url_for
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
@@ -16,23 +17,25 @@ from forms import ShowForm, VenueForm, ArtistForm
 # ----------------------------------------------------------------------------#
 # App Config.
 # ----------------------------------------------------------------------------#
+HOME_PAGE = 'pages/home.html'
 
 app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://machk:claudine@localhost:5432/lopfuyr'
+
 db = SQLAlchemy(app)
-
-
-# TODO: connect to a local postgresql database
-
+migrate = Migrate(app, db)
 # ----------------------------------------------------------------------------#
 # Models.
 # ----------------------------------------------------------------------------#
+show = db.Table('order_items',
+                       db.Column('venue_id', db.Integer, db.ForeignKey('venue.id'), primary_key=True),
+                       db.Column('artist_id', db.Integer, db.ForeignKey('artist.id'), primary_key=True)
+                       )
+
 
 class Venue(db.Model):
     __tablename__ = 'Venue'
-
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
     city = db.Column(db.String(120))
@@ -41,8 +44,9 @@ class Venue(db.Model):
     phone = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
+    artists = db.relationship('Artist', secondary=show,
+                               backref=db.backref('artist', lazy=True))
 
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
 
 class Artist(db.Model):
@@ -84,7 +88,7 @@ app.jinja_env.filters['datetime'] = format_datetime
 
 @app.route('/')
 def index():
-    return render_template('pages/home.html')
+    return render_template(HOME_PAGE)
 
 
 #  Venues
@@ -239,7 +243,7 @@ def create_venue_submission():
     # TODO: on unsuccessful db insert, flash an error instead.
     # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
     # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-    return render_template('pages/home.html')
+    return render_template(HOME_PAGE)
 
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
@@ -443,7 +447,7 @@ def create_artist_submission():
     flash('Artist ' + request.form['name'] + ' was successfully listed!')
     # TODO: on unsuccessful db insert, flash an error instead.
     # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
-    return render_template('pages/home.html')
+    return render_template(HOME_PAGE)
 
 
 #  Shows
@@ -509,7 +513,7 @@ def create_show_submission():
     # TODO: on unsuccessful db insert, flash an error instead.
     # e.g., flash('An error occurred. Show could not be listed.')
     # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-    return render_template('pages/home.html')
+    return render_template(HOME_PAGE)
 
 
 @app.errorhandler(404)
