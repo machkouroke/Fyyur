@@ -13,6 +13,8 @@ import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import ShowForm, VenueForm, ArtistForm
+from sqlalchemy import inspect
+from sqlalchemy.ext.declarative import as_declarative
 
 # ----------------------------------------------------------------------------#
 # App Config.
@@ -35,7 +37,16 @@ show = db.Table('show',
                 )
 
 
-class Venue(db.Model):
+class Base:
+    def _asdict(self):
+        """
+        Return a dictionary representation of the model.
+        """
+        return {c.key: getattr(self, c.key)
+                for c in inspect(self).mapper.column_attrs}
+
+
+class Venue(db.Model, Base):
     __tablename__ = 'Venue'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String)
@@ -45,14 +56,18 @@ class Venue(db.Model):
     phone = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
-    website_link = db.Column(db.String(120))
-    looking_for_talent = db.Column(db.Boolean)
+    website = db.Column(db.String(120))
+    seeking_talent = db.Column(db.Boolean)
     artists = db.relationship('Artist', secondary=show,
                               backref=db.backref('artists', lazy=True))
+    shows = db.relationship('show', backref='show', lazy=True)
+    genres = db.Column(db.PickleType())
+
     def __repr__(self):
         return f'<Venue {self.id} {self.name}>'
 
-class Artist(db.Model):
+
+class Artist(db.Model, Base):
     __tablename__ = 'Artist'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -63,8 +78,10 @@ class Artist(db.Model):
     genres = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
-    website_link = db.Column(db.String(120))
+    website = db.Column(db.String(120))
     looking_for_venues = db.Column(db.Boolean)
+
+
     def __repr__(self):
         return f'<Artist {self.id} {self.name}>'
 
@@ -139,6 +156,8 @@ def search_venues():
 def show_venue(venue_id):
     # shows the venue page with the given venue_id
     # TODO: replace with real venue data from the venues table, using venue_id
+    venue = Venue.query.get(venue_id)
+    data = {**venue._asdict()}
     data1 = {
         "id": 1,
         "name": "The Musical Hop",
@@ -256,17 +275,14 @@ def delete_venue(venue_id):
 #  ----------------------------------------------------------------
 @app.route('/artists')
 def artists():
-    # TODO: replace with real data returned from querying the database
-    data = [{
-        "id": 4,
-        "name": "Guns N Petals",
-    }, {
-        "id": 5,
-        "name": "Matt Quevedo",
-    }, {
-        "id": 6,
-        "name": "The Wild Sax Band",
-    }]
+    data = [
+        {
+            "id": artist[0],
+            "name": artist[1],
+
+        }
+        for artist in Artist.query.with_entities(Artist.id, Artist.name)
+    ]
     return render_template('pages/artists.html', artists=data)
 
 
