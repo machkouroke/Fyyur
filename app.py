@@ -21,6 +21,7 @@ from sqlalchemy.ext.declarative import as_declarative
 # ----------------------------------------------------------------------------#
 # App Config.
 # ----------------------------------------------------------------------------#
+TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 HOME_PAGE = 'pages/home.html'
 
 app = Flask(__name__)
@@ -36,22 +37,22 @@ migrate = Migrate(app, db)
 # ----------------------------------------------------------------------------#
 
 
-class Show(db.Model):
+class Base:
+    def _asdict(self) -> dict:
+        """
+        Return a dictionary representation of the model.
+        """
+        return {c.key: getattr(self, c.key)
+                for c in inspect(self).mapper.column_attrs}
+
+
+class Show(db.Model, Base):
     __tablename__ = 'show'
     venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), primary_key=True)
     artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), primary_key=True)
     start_time = db.Column(db.DateTime, primary_key=True)
     venue = db.relationship('Venue', backref=db.backref('shows', lazy=True))
     artist = db.relationship('Artist', backref=db.backref('shows', lazy=True))
-
-
-class Base:
-    def _asdict(self):
-        """
-        Return a dictionary representation of the model.
-        """
-        return {c.key: getattr(self, c.key)
-                for c in inspect(self).mapper.column_attrs}
 
 
 class Venue(db.Model, Base):
@@ -120,6 +121,9 @@ def index():
 
 @app.route('/venues')
 def venues():
+    """
+    List all venues
+    """
     data = [
         {
             "city": location[0],
@@ -166,14 +170,14 @@ def show_venue(venue_id):
         "artist_id": x.artist_id,
         "artist_name": x.artist.name,
         "artist_image_link": x.artist.image_link,
-        "start_time": x.start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        "start_time": x.start_time.strftime(TIME_FORMAT)
     } for x in Show.query.filter(Show.venue_id == venue_id, Show.start_time < datetime.now()).all()]
 
     upcoming_shows = [{
         "artist_id": x.artist_id,
         "artist_name": x.artist.name,
         "artist_image_link": x.artist.image_link,
-        "start_time": x.start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        "start_time": x.start_time.strftime(TIME_FORMAT)
     } for x in Show.query.filter(Show.venue_id == venue_id, Show.start_time > datetime.now()).all()]
 
     shows = {"past_shows": past_shows, "upcoming_shows": upcoming_shows, "past_shows_count": len(past_shows),
@@ -248,22 +252,21 @@ def search_artists():
 
 @app.route('/artists/<int:artist_id>')
 def show_artist(artist_id):
-    # shows the artist page with the given artist_id
-    # TODO: replace with real artist data from the artist table, using artist_id
+    """shows the artist page with the given artist_id"""
     artist = Artist.query.get(artist_id)
 
     past_shows = [{
         "venue_id": x.artist_id,
         "venue_name": x.artist.name,
         "venue_image_link": x.artist.image_link,
-        "start_time": x.start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        "start_time": x.start_time.strftime(TIME_FORMAT)
     } for x in Show.query.filter(Show.artist_id == artist_id, Show.start_time < datetime.now()).all()]
 
     upcoming_shows = [{
         "venue_id": x.artist_id,
         "venue_name": x.artist.name,
         "venue_image_link": x.artist.image_link,
-        "start_time": x.start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        "start_time": x.start_time.strftime(TIME_FORMAT)
     } for x in Show.query.filter(Show.artist_id == artist_id, Show.start_time > datetime.now()).all()]
 
     shows = {"past_shows": past_shows, "upcoming_shows": upcoming_shows, "past_shows_count": len(past_shows),
@@ -356,44 +359,15 @@ def create_artist_submission():
 
 @app.route('/shows')
 def shows():
-    # displays list of shows at /shows
-    # TODO: replace with real venues data.
-    data = [{
-        "venue_id": 1,
-        "venue_name": "The Musical Hop",
-        "artist_id": 4,
-        "artist_name": "Guns N Petals",
-        "artist_image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
-        "start_time": "2019-05-21T21:30:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 5,
-        "artist_name": "Matt Quevedo",
-        "artist_image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
-        "start_time": "2019-06-15T23:00:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 6,
-        "artist_name": "The Wild Sax Band",
-        "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "start_time": "2035-04-01T20:00:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 6,
-        "artist_name": "The Wild Sax Band",
-        "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "start_time": "2035-04-08T20:00:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 6,
-        "artist_name": "The Wild Sax Band",
-        "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "start_time": "2035-04-15T20:00:00.000Z"
-    }]
+    """displays list of shows at /shows"""
+
+    data = [{**show._asdict(),
+             **{"venue_name": show.venue.name},
+             **{"artist_name": show.artist.name, "artist_image_link": show.artist.image_link}}
+            for show in Show.query.all()]
+    for show in data:
+        show['start_time'] = show['start_time'].strftime(TIME_FORMAT)
+
     return render_template('pages/shows.html', shows=data)
 
 
