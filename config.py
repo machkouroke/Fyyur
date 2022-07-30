@@ -1,4 +1,7 @@
 import os
+
+import babel
+import dateutil
 from flask import Flask
 from flask_migrate import Migrate
 from flask_moment import Moment
@@ -24,6 +27,17 @@ app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
 
+
+def format_datetime(value, format='medium'):
+    date = dateutil.parser.parse(value)
+    if format == 'full':
+        format = "EEEE MMMM, d, y 'at' h:mma"
+    elif format == 'medium':
+        format = "EE MM, dd, y h:mma"
+    return babel.dates.format_datetime(date, format, locale='en')
+
+
+app.jinja_env.filters['datetime'] = format_datetime
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
