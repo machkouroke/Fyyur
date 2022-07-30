@@ -4,7 +4,6 @@
 
 import json
 from datetime import datetime
-from pprint import pprint
 
 import dateutil.parser
 import babel
@@ -16,90 +15,14 @@ import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import ShowForm, VenueForm, ArtistForm
-from sqlalchemy import inspect, func
-from sqlalchemy.ext.declarative import as_declarative
+from sqlalchemy import func
+from models import Venue, Artist, Show, app, db, moment
 
-# ----------------------------------------------------------------------------#
-# App Config.
-# ----------------------------------------------------------------------------#
+"""Constants"""
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 HOME_PAGE = 'pages/home.html'
 
-app = Flask(__name__)
-moment = Moment(app)
-app.config.from_object('config')
-
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-
-
-# ----------------------------------------------------------------------------#
-# Models.
-# ----------------------------------------------------------------------------#
-
-
-class Base:
-    def _asdict(self) -> dict:
-        """
-        Return a dictionary representation of the model.
-        """
-        return {c.key: getattr(self, c.key)
-                for c in inspect(self).mapper.column_attrs}
-
-
-class Show(db.Model, Base):
-    __tablename__ = 'show'
-    venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), primary_key=True)
-    artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), primary_key=True)
-    start_time = db.Column(db.DateTime, primary_key=True)
-    venue = db.relationship('Venue', backref=db.backref('shows', lazy=True, cascade="save-update, merge, "
-                                                                                    "delete, delete-orphan"))
-    artist = db.relationship('Artist', backref=db.backref('shows', lazy=True, cascade="save-update, merge, "
-                                                                                      "delete, delete-orphan"))
-
-
-class Venue(db.Model, Base):
-    __tablename__ = 'Venue'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
-    city = db.Column(db.String(120), nullable=False)
-    state = db.Column(db.String(120), nullable=False)
-    address = db.Column(db.String(120), nullable=False)
-    phone = db.Column(db.String(120))
-    image_link = db.Column(db.String(1000))
-    facebook_link = db.Column(db.String(500))
-    website = db.Column(db.String(500))
-    seeking_talent = db.Column(db.Boolean)
-    genres = db.Column(db.PickleType())
-    seeking_description = db.Column(db.TEXT())
-
-    def __repr__(self):
-        return f'<Venue {self.id} {self.name}>'
-
-
-class Artist(db.Model, Base):
-    __tablename__ = 'Artist'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    phone = db.Column(db.String(120))
-    genres = db.Column(db.PickleType())
-    image_link = db.Column(db.String(1000))
-    facebook_link = db.Column(db.String(500))
-    website = db.Column(db.String(500))
-    seeking_venue = db.Column(db.Boolean)
-    seeking_description = db.Column(db.TEXT())
-
-    def __repr__(self):
-        return f'<Artist {self.id} {self.name}>'
-
-
-# ----------------------------------------------------------------------------#
-# Filters.
-# ----------------------------------------------------------------------------#
-
+"""Filters"""
 def format_datetime(value, format='medium'):
     date = dateutil.parser.parse(value)
     if format == 'full':
@@ -192,7 +115,7 @@ def show_venue(venue_id):
     shows = {"past_shows": past_shows, "upcoming_shows": upcoming_shows, "past_shows_count": len(past_shows),
              "upcoming_shows_count": len(upcoming_shows)}
 
-    return render_template('pages/show_venue.html', venue={**venue._asdict(), **shows})
+    return render_template('pages/show_venue.html', venue={**venue.asdict(), **shows})
 
 
 #  Create Venue
@@ -297,7 +220,7 @@ def show_artist(artist_id):
 
     shows = {"past_shows": past_shows, "upcoming_shows": upcoming_shows, "past_shows_count": len(past_shows),
              "upcoming_shows_count": len(upcoming_shows)}
-    return render_template('pages/show_artist.html', artist={**artist._asdict(), **shows})
+    return render_template('pages/show_artist.html', artist={**artist.asdict(), **shows})
 
 
 @app.route('/artists/<artist_id>/delete', methods=["GET", "POST", "DELETE"])
@@ -347,29 +270,17 @@ def edit_artist_submission(artist_id):
 
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
-    form = VenueForm()
-    venue = {
-        "id": 1,
-        "name": "The Musical Hop",
-        "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
-        "address": "1015 Folsom Street",
-        "city": "San Francisco",
-        "state": "CA",
-        "phone": "123-123-1234",
-        "website": "https://www.themusicalhop.com",
-        "facebook_link": "https://www.facebook.com/TheMusicalHop",
-        "seeking_talent": True,
-        "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
-        "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60"
-    }
-    # TODO: populate form with values from venue with ID <venue_id>
+    venue = Venue.query.get(venue_id).asdict()
+    form = VenueForm(**venue)
+
     return render_template('forms/edit_venue.html', form=form, venue=venue)
 
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
     # TODO: take values from the form submitted, and update existing
-    # venue record with ID <venue_id> using the new attributes
+    # try:
+    #     db.session.query(Venue).filter_by(id=venue_id).update({"name": "Ensa"})
     return redirect(url_for('show_venue', venue_id=venue_id))
 
 
@@ -412,7 +323,7 @@ def create_artist_submission():
 def shows():
     """displays list of shows at /shows"""
 
-    data = [{**show._asdict(),
+    data = [{**show.asdict(),
              **{"venue_name": show.venue.name},
              **{"artist_name": show.artist.name, "artist_image_link": show.artist.image_link}}
             for show in Show.query.all()]
