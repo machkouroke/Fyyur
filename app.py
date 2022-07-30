@@ -52,21 +52,23 @@ class Show(db.Model, Base):
     venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), primary_key=True)
     artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), primary_key=True)
     start_time = db.Column(db.DateTime, primary_key=True)
-    venue = db.relationship('Venue', backref=db.backref('shows', lazy=True))
-    artist = db.relationship('Artist', backref=db.backref('shows', lazy=True))
+    venue = db.relationship('Venue', backref=db.backref('shows', lazy=True, cascade="save-update, merge, "
+                                                                                    "delete, delete-orphan"))
+    artist = db.relationship('Artist', backref=db.backref('shows', lazy=True, cascade="save-update, merge, "
+                                                                                      "delete, delete-orphan"))
 
 
 class Venue(db.Model, Base):
     __tablename__ = 'Venue'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    address = db.Column(db.String(120))
+    name = db.Column(db.String, nullable=False)
+    city = db.Column(db.String(120), nullable=False)
+    state = db.Column(db.String(120), nullable=False)
+    address = db.Column(db.String(120), nullable=False)
     phone = db.Column(db.String(120))
-    image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
-    website = db.Column(db.String(120))
+    image_link = db.Column(db.String(1000))
+    facebook_link = db.Column(db.String(500))
+    website = db.Column(db.String(500))
     seeking_talent = db.Column(db.Boolean)
     genres = db.Column(db.PickleType())
     seeking_description = db.Column(db.TEXT())
@@ -79,14 +81,14 @@ class Artist(db.Model, Base):
     __tablename__ = 'Artist'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
+    name = db.Column(db.String, nullable=False)
     city = db.Column(db.String(120))
     state = db.Column(db.String(120))
     phone = db.Column(db.String(120))
     genres = db.Column(db.PickleType())
-    image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
-    website = db.Column(db.String(120))
+    image_link = db.Column(db.String(1000))
+    facebook_link = db.Column(db.String(500))
+    website = db.Column(db.String(500))
     seeking_venue = db.Column(db.Boolean)
     seeking_description = db.Column(db.TEXT())
 
@@ -206,11 +208,13 @@ def create_venue_form():
 def create_venue_submission():
     try:
         venue = Venue(name=request.form['name'], city=request.form['city'], state=request.form['state'],
-                      address=request.form['address'], phone=request.form['phone'],
+                      address=request.form['address'], phone=request.form.get('phone', None),
                       genres=request.form.getlist('genres'),
-                      image_link=request.form['image_link'], facebook_link=request.form['facebook_link'],
-                      website=request.form['website_link'], seeking_talent=request.form['seeking_talent'] == 'y',
-                      seeking_description=request.form['seeking_description'])
+                      image_link=request.form.get('image_link', None),
+                      facebook_link=request.form.get('facebook_link', None),
+                      website=request.form.get('website_link', None),
+                      seeking_talent=request.form.get('seeking_talent', None) == 'y',
+                      seeking_description=request.form.get('seeking_description', None))
         db.session.add(venue)
         db.session.commit()
         flash('Venue ' + request.form['name'] + ' was successfully listed!')
@@ -222,14 +226,20 @@ def create_venue_submission():
     return render_template(HOME_PAGE)
 
 
-@app.route('/venues/<venue_id>', methods=['DELETE'])
+@app.route('/venues/<venue_id>/delete', methods=["GET", "POST", "DELETE"])
 def delete_venue(venue_id):
-    # TODO: Complete this endpoint for taking a venue_id, and using
-    # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
-
-    # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
-    # clicking that button delete it from the db then redirect the user to the homepage
-    return None
+    print("venue", venue_id)
+    try:
+        venue = Venue.query.get(venue_id)
+        db.session.delete(venue)
+        db.session.commit()
+        flash(f'Venue {venue.name} was successfully deleted!')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"An error occurred:{e} Venue {Venue.query.get(venue_id).name} could not be deleted.")
+    finally:
+        db.session.close()
+    return render_template(HOME_PAGE)
 
 
 #  Artists
@@ -288,6 +298,21 @@ def show_artist(artist_id):
     shows = {"past_shows": past_shows, "upcoming_shows": upcoming_shows, "past_shows_count": len(past_shows),
              "upcoming_shows_count": len(upcoming_shows)}
     return render_template('pages/show_artist.html', artist={**artist._asdict(), **shows})
+
+
+@app.route('/artists/<artist_id>/delete', methods=["GET", "POST", "DELETE"])
+def delete_artist(artist_id):
+    try:
+        artist = Artist.query.get(artist_id)
+        db.session.delete(artist)
+        db.session.commit()
+        flash(f'Artist {artist.name} was successfully deleted!')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"An error occurred:{e} Artist {Artist.query.get(artist_id).name} could not be deleted.")
+    finally:
+        db.session.close()
+    return render_template(HOME_PAGE)
 
 
 #  Update
@@ -360,12 +385,15 @@ def create_artist_form():
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
     try:
-        artist = Artist(name=request.form['name'], city=request.form['city'], state=request.form['state'],
-                        phone=request.form['phone'],
+        artist = Artist(name=request.form['name'], city=request.form.get('city', None),
+                        state=request.form.get('state', None),
+                        phone=request.form.get('phone', None),
                         genres=request.form.getlist('genres'),
-                        image_link=request.form['image_link'], facebook_link=request.form['facebook_link'],
-                        website=request.form['website_link'], seeking_venue=request.form['seeking_venue'] == 'y',
-                        seeking_description=request.form['seeking_description'])
+                        image_link=request.form.get('image_link', None),
+                        facebook_link=request.form.get('facebook_link', None),
+                        website=request.form.get('website_link', None),
+                        seeking_venue=request.form.get('seeking_venue', None) == 'y',
+                        seeking_description=request.form.get('seeking_description', None))
         db.session.add(artist)
         db.session.commit()
         flash('Artist ' + request.form['name'] + ' was successfully listed!')
