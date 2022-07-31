@@ -71,9 +71,9 @@ def delete_artist(artist_id):
         db.session.delete(artist)
         db.session.commit()
         flash(f'Artist {artist.name} was successfully deleted!')
-    except Exception:
+    except Exception as e:
         db.session.rollback()
-        flash(f"An error occurred: Artist {Artist.query.get(artist_id).name} could not be deleted.")
+        flash(f"An error occurred:{e} Artist {Artist.query.get(artist_id).name} could not be deleted.")
     finally:
         db.session.close()
     return render_template(HOME_PAGE)
