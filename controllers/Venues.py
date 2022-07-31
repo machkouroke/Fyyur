@@ -88,14 +88,9 @@ def create_venue_form():
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
     try:
-        venue = Venue(name=request.form['name'], city=request.form['city'], state=request.form['state'],
-                      address=request.form['address'], phone=request.form.get('phone', None),
-                      genres=request.form.getlist('genres'),
-                      image_link=request.form.get('image_link', None),
-                      facebook_link=request.form.get('facebook_link', None),
-                      website=request.form.get('website', None),
-                      seeking_talent=request.form.get('seeking_talent', None) == 'y',
-                      seeking_description=request.form.get('seeking_description', None))
+        data_from_form = multidict_to_dict(request.form)
+        data_from_form['seeking_talent'] = data_from_form.get('seeking_talent', "n") == 'y'
+        venue = Venue(**data_from_form)
         db.session.add(venue)
         db.session.commit()
         flash('Venue ' + request.form['name'] + ' was successfully listed!')

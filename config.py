@@ -43,5 +43,12 @@ migrate = Migrate(app, db)
 
 
 def multidict_to_dict(data: ImmutableMultiDict) -> dict:
+    """
+    Convert a ImmutableMultiDict to a dict.
+    If a value is in multiple a list is associated with the key of the value. This is useful for directly unpacking
+    a query object in a model's constructor
+    :param data: Some ImmutableMultiDict
+    :return: A dict
+    """
     return {field: data.getlist(field) if field == "genres" else data.get(field, None) for
             field in data.keys()}

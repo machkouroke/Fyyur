@@ -10,6 +10,7 @@ class Utilities:
     def asdict(self) -> dict:
         """
         Return a dictionary representation of the model.
+        The dictionary contains all the attributes of the model
         """
         return {c.key: getattr(self, c.key)
                 for c in inspect(self).mapper.column_attrs}

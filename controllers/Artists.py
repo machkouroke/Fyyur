@@ -95,15 +95,9 @@ def create_artist_form():
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
     try:
-        artist = Artist(name=request.form['name'], city=request.form.get('city', None),
-                        state=request.form.get('state', None),
-                        phone=request.form.get('phone', None),
-                        genres=request.form.getlist('genres'),
-                        image_link=request.form.get('image_link', None),
-                        facebook_link=request.form.get('facebook_link', None),
-                        website=request.form.get('website', None),
-                        seeking_venue=request.form.get('seeking_venue', None) == 'y',
-                        seeking_description=request.form.get('seeking_description', None))
+        data_from_form = multidict_to_dict(request.form)
+        data_from_form['seeking_venue'] = data_from_form.get('seeking_venue', "n") == 'y'
+        artist = Artist(**data_from_form)
         db.session.add(artist)
         db.session.commit()
         flash('Artist ' + request.form['name'] + ' was successfully listed!')
