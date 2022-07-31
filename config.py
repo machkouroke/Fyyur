@@ -1,7 +1,7 @@
 import os
 
 import babel
-import dateutil
+import dateutil.parser
 from flask import Flask
 from flask_migrate import Migrate
 from flask_moment import Moment

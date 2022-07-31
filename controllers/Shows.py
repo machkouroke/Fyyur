@@ -1,4 +1,5 @@
 from flask import render_template, request, flash
+from sqlalchemy.exc import IntegrityError
 
 from config import app, TIME_FORMAT, db, HOME_PAGE
 from forms import ShowForm
@@ -34,9 +35,15 @@ def create_show_submission():
         db.session.add(show)
         db.session.commit()
         flash('Show was successfully listed!')
-    except Exception as e:
+
+    except IntegrityError as e:
+        if 'ForeignKeyViolation' in str(e):
+            flash('Show could not be listed. Artist or Venue does not exist.')
+        elif "UniqueViolation" in str(e):
+            flash('Show could not be listed. Show already exists.')
+        else:
+            flash('An error occurred:  Show could not be listed.')
         db.session.rollback()
-        flash(f'An error occurred: {e} Show could not be listed.')
     finally:
         db.session.close()
 
